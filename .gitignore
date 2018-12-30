@@ -1,0 +1,18 @@
+# Set the default behavior, in case people don't have core.autocrlf set.
+* text eol=lf
+
+# FunPDBe repositories.
+funpdbe-client
+funpdbe-schema
+funpdbe-validator
+
+# Byte-compiled / optimized / DLL files:
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Hidden files:
+.*
+
+# Data directory.
+data
