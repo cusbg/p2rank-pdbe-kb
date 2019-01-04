@@ -74,7 +74,7 @@ def main():
                     ERROR_DIRECTORY, os.path.basename(output_path))
                 shutil.move(output_path, error_path)
     logging.info("Converted: %s failed: %s",
-                 len(pdb_id) - len(failed), len(failed))
+                 len(pdb_ids) - len(failed), len(failed))
 
 
 def init_logging(level=logging.DEBUG):
