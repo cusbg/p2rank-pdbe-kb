@@ -126,7 +126,7 @@ def convert_file(pdb_id, pocket_path, residues_path, output_path):
 
 
 def read_residues(residues_path):
-    # chain, residue_num, residue_name, score, zscore, probability, pocket
+    # chain, residue_label, residue_name, score, zscore, probability, pocket
     return {
         "{}_{}".format(row[0], row[1]): {
             "chains": row[0],
