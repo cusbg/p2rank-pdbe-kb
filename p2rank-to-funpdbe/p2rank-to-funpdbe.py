@@ -168,10 +168,9 @@ def create_site(pocket):
 
 
 def iterate_site_residues(pocket, residues, site_id):
-    for res_name in pocket["residues"]:
-        if res_name not in residues:
-            raise RuntimeError("Missing residue {}".format(res_name))
-        yield residue_to_site_data(residues[res_name], site_id)
+    for residue in residues:
+        if residue["pocket"] == pocket["rank"]:
+            yield residue_to_site_data(residue, site_id)
 
 
 def residue_to_site_data(residue, site_id):
