@@ -127,14 +127,14 @@ def convert_file(pdb_id, pocket_path, residues_path, output_path):
 
 def read_residues(residues_path):
     # chain, residue_label, residue_name, score, zscore, probability, pocket
-    return {
-        "{}_{}".format(row[0], row[1]): {
-            "chains": row[0],
-            "type": row[2],
-            "label": row[1],
-            "score": float(row[3]),
-            "probability": float(row[5]),
-        } for row in iterate_csv_file(residues_path)}
+    return [{
+        "chains": row["chain"],
+        "type": row["residue_name"],
+        "label": row["residue_label"],
+        "score": float(row["score"]),
+        "probability": float(row["probability"]),
+        "pocket": row["pocket"]
+    } for row in iterate_csv_file(residues_path)]
 
 
 def iterate_csv_file(path):
@@ -143,9 +143,9 @@ def iterate_csv_file(path):
             input_stream,
             delimiter=",",
             skipinitialspace=True)
-        next(csv_reader)
+        header = next(csv_reader)
         for row in csv_reader:
-            yield row
+            yield {key: value for key, value in zip(header, row)}
 
 
 def read_pockets(pocket_path):
@@ -153,9 +153,9 @@ def read_pockets(pocket_path):
     # center_x, center_y, center_z,
     # residue_ids, surf_atom_ids
     return [{
-        "name": row[0],
-        "score": row[2],
-        "residues": row[8].split(" ")
+        "name": row["name"],
+        "score": row["score"],
+        "rank": row["rank"]
     } for row in iterate_csv_file(pocket_path)]
 
 
