@@ -23,7 +23,7 @@ P2RANK_WEB_URL = "http://prank.projekty.ms.mff.cuni.cz/analyze/id_noconser/{}"
 RELEASE_DATE = datetime.date.today().strftime("%d/%m/%Y")
 
 EVIDENCE_CODE_ONTOLOGY = [
-    {  # TODO Decide what to use,
+    {
         "eco_term": "computational combinatorial evidence",
         "eco_code": "ECO_0000246"
     }
