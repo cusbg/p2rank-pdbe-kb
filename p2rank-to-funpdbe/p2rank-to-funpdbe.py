@@ -186,14 +186,25 @@ def read_pockets(pocket_path):
     return [{
         "name": row["name"],
         "score": row["score"],
-        "rank": row["rank"]
+        "rank": row["rank"],
+        "center_x": row["center_x"],
+        "center_y": row["center_y"],
+        "center_z": row["center_z"]
     } for row in iterate_csv_file(pocket_path)]
 
 
 def create_site(pocket):
     site = {
         "site_id": int(pocket["name"].replace("pocket", "")),
-        "label": pocket["name"]
+        "label": pocket["name"],
+        "additional_site_annotations": {
+            "score": pocket["score"],
+            "center": {
+                "x": pocket["center_x"],
+                "y": pocket["center_y"],
+                "z": pocket["center_z"]
+            }
+        }
     }
     return site
 
