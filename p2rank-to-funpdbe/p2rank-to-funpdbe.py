@@ -76,7 +76,7 @@ def check_directories():
 def collect_pdb_ids(input_dir):
     result = set()
     for file in os.listdir(input_dir):
-        if "_predictions.csv" in file:
+        if "pdb" in file:
             result.add(file[:file.index(".")])
     return sorted(list(result))
 
@@ -93,8 +93,8 @@ def convert_single_thread(pdb_ids, arguments):
         try:
             convert_file(
                 pdb_id.upper(),
-                os.path.join(input_dir, pdb_id + ".pdb_predictions.csv"),
-                os.path.join(input_dir, pdb_id + ".pdb_residues.csv"),
+                os.path.join(input_dir, pdb_id + ".pdb.gz_predictions.csv"),
+                os.path.join(input_dir, pdb_id + ".pdb.gz_residues.csv"),
                 output_path)
         except Exception as error:
             failed.append(pdb_id)
