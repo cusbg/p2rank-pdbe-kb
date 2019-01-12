@@ -18,7 +18,7 @@ RESOURCE_VERSION = "1.0"
 
 P2RANK_VERSION = "2.0"
 
-P2RANK_WEB_URL = "http://prank.projekty.ms.mff.cuni.cz/analyze/id/{}"
+P2RANK_WEB_URL = "http://prank.projekty.ms.mff.cuni.cz/analyze/id_noconser/{}"
 
 RELEASE_DATE = datetime.date.today().strftime("%d/%m/%Y")
 
