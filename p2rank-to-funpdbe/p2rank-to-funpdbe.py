@@ -30,8 +30,8 @@ EVIDENCE_CODE_ONTOLOGY = [
 ]
 
 PROBABILITY_TO_CONFIDENCE_THRESHOLDS = [
-    (0.5, "low"),
-    (0.8, "medium"),
+    (0.33, "low"),
+    (0.6, "medium"),
     (1.0, "high"),
 ]
 
