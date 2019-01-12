@@ -76,7 +76,7 @@ def check_directories():
 def collect_pdb_ids(input_dir):
     result = set()
     for file in os.listdir(input_dir):
-        if "pdb_predictions.csv" in file:
+        if "_predictions.csv" in file:
             result.add(file[:file.index(".")])
     return sorted(list(result))
 
