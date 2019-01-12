@@ -130,8 +130,8 @@ def convert_pdb_file(task):
     try:
         convert_file(
             pdb_id.upper(),
-            os.path.join(input_dir, pdb_id + ".pdb_predictions.csv"),
-            os.path.join(input_dir, pdb_id + ".pdb_residues.csv"),
+            os.path.join(input_dir, pdb_id + ".pdb.gz_predictions.csv"),
+            os.path.join(input_dir, pdb_id + ".pdb.gz_residues.csv"),
             output_path)
     except Exception as error:
         logging.exception("Conversion failed for %s : %s", pdb_id, error)
