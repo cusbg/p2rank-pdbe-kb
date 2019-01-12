@@ -31,4 +31,5 @@ git clone https://gitlabci.ebi.ac.uk/pdbe-kb/funpdbe/funpdbe-validator.git
 * Run the conversion script:
 ```
 python p2rank-to-funpdbe/p2rank-to-funpdbe.py
+python p2rank-to-funpdbe/p2rank-to-funpdbe.py --threads 4
 ```

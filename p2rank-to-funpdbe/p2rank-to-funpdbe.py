@@ -8,6 +8,8 @@ import datetime
 import json
 import sys
 import shutil
+import multiprocessing
+import argparse
 
 from validator.validator import Validator
 from validator.residue_index import ResidueIndexes
@@ -50,31 +52,15 @@ ERROR_DIRECTORY = os.path.join(
     THIS_DIRECTORY, "..", "data", "error")
 
 
-def main():
+def main(arguments):
     init_logging()
     initialize_directories()
     check_directories()
-
     pdb_ids = collect_pdb_ids()
-    failed = []
-    for index, pdb_id in enumerate(pdb_ids):
-        logging.info("%i/%i : %s", index, len(pdb_ids), pdb_id)
-        output_path = os.path.join(OUTPUT_DIRECTORY, pdb_id + ".json")
-        try:
-            convert_file(
-                pdb_id.upper(),
-                os.path.join(INPUT_DIRECTORY, pdb_id + ".pdb_predictions.csv"),
-                os.path.join(INPUT_DIRECTORY, pdb_id + ".pdb_residues.csv"),
-                output_path)
-        except Exception as error:
-            failed.append(pdb_id)
-            logging.exception("Conversion failed for %s : %s", pdb_id, error)
-            if os.path.exists(output_path):
-                error_path = os.path.join(
-                    ERROR_DIRECTORY, os.path.basename(output_path))
-                shutil.move(output_path, error_path)
-    logging.info("Converted: %s failed: %s",
-                 len(pdb_ids) - len(failed), len(failed))
+    if arguments["threads"] < 2:
+        convert_single_thread(pdb_ids)
+    else:
+        convert_multiple_threads(pdb_ids, arguments["threads"])
 
 
 def init_logging(level=logging.DEBUG):
@@ -102,6 +88,51 @@ def collect_pdb_ids():
         if "pdb_predictions.csv" in file:
             result.add(file[:file.index(".")])
     return sorted(list(result))
+
+
+def convert_single_thread(pdb_ids):
+    failed = []
+    for index, pdb_id in enumerate(pdb_ids):
+        logging.info("%i/%i : %s", index, len(pdb_ids), pdb_id)
+        output_path = os.path.join(OUTPUT_DIRECTORY, pdb_id + ".json")
+        try:
+            convert_file(
+                pdb_id.upper(),
+                os.path.join(INPUT_DIRECTORY, pdb_id + ".pdb_predictions.csv"),
+                os.path.join(INPUT_DIRECTORY, pdb_id + ".pdb_residues.csv"),
+                output_path)
+        except Exception as error:
+            failed.append(pdb_id)
+            logging.exception("Conversion failed for %s : %s", pdb_id, error)
+            if os.path.exists(output_path):
+                error_path = os.path.join(
+                    ERROR_DIRECTORY, os.path.basename(output_path))
+                shutil.move(output_path, error_path)
+    logging.info("Converted: %s failed: %s",
+                 len(pdb_ids) - len(failed), len(failed))
+
+
+def convert_multiple_threads(pdb_ids, threads):
+    pool = multiprocessing.Pool(threads)
+    logging.info("Converting file ...")
+    pool.map(convert_pdb_file, pdb_ids)
+    logging.info("Converting file ... done")
+
+
+def convert_pdb_file(pdb_id):
+    output_path = os.path.join(OUTPUT_DIRECTORY, pdb_id + ".json")
+    try:
+        convert_file(
+            pdb_id.upper(),
+            os.path.join(INPUT_DIRECTORY, pdb_id + ".pdb_predictions.csv"),
+            os.path.join(INPUT_DIRECTORY, pdb_id + ".pdb_residues.csv"),
+            output_path)
+    except Exception as error:
+        logging.exception("Conversion failed for %s : %s", pdb_id, error)
+        if os.path.exists(output_path):
+            error_path = os.path.join(
+                ERROR_DIRECTORY, os.path.basename(output_path))
+            shutil.move(output_path, error_path)
 
 
 def convert_file(pdb_id, pocket_path, residues_path, output_path):
@@ -251,4 +282,7 @@ def validate_file(path):
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--threads", type=int, dest="threads", required=False,
+                        default=0, help="Number of threads to use.")
+    main(vars(parser.parse_args()))
