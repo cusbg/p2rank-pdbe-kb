@@ -39,28 +39,19 @@ PROBABILITY_TO_CONFIDENCE_THRESHOLDS = [
 
 THIS_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 
-INPUT_DIRECTORY = os.path.join(
-    THIS_DIRECTORY, "..", "data", "p2rank-outputs")
-
-OUTPUT_DIRECTORY = os.path.join(
-    THIS_DIRECTORY, "..", "data", "funpdbe")
-
 FUNPDBE_SCHEMA = os.path.join(
     THIS_DIRECTORY, "..", "funpdbe-validator", "data", "funpdbe_schema.json")
-
-ERROR_DIRECTORY = os.path.join(
-    THIS_DIRECTORY, "..", "data", "error")
 
 
 def main(arguments):
     init_logging()
-    initialize_directories()
+    initialize_directories(arguments)
     check_directories()
-    pdb_ids = collect_pdb_ids()
+    pdb_ids = collect_pdb_ids(arguments["input"])
     if arguments["threads"] < 2:
-        convert_single_thread(pdb_ids)
+        convert_single_thread(pdb_ids, arguments)
     else:
-        convert_multiple_threads(pdb_ids, arguments["threads"])
+        convert_multiple_threads(pdb_ids, arguments)
 
 
 def init_logging(level=logging.DEBUG):
@@ -70,10 +61,10 @@ def init_logging(level=logging.DEBUG):
         datefmt="%H:%M:%S")
 
 
-def initialize_directories():
-    os.makedirs(INPUT_DIRECTORY, exist_ok=True)
-    os.makedirs(OUTPUT_DIRECTORY, exist_ok=True)
-    os.makedirs(ERROR_DIRECTORY, exist_ok=True)
+def initialize_directories(arguments):
+    os.makedirs(arguments["input"], exist_ok=True)
+    os.makedirs(arguments["output"], exist_ok=True)
+    os.makedirs(arguments["errorOutput"], exist_ok=True)
 
 
 def check_directories():
@@ -82,56 +73,71 @@ def check_directories():
             "Missing FunPDBe schema. Please read installation guide.")
 
 
-def collect_pdb_ids():
+def collect_pdb_ids(input_dir):
     result = set()
-    for file in os.listdir(INPUT_DIRECTORY):
+    for file in os.listdir(input_dir):
         if "pdb_predictions.csv" in file:
             result.add(file[:file.index(".")])
     return sorted(list(result))
 
 
-def convert_single_thread(pdb_ids):
+def convert_single_thread(pdb_ids, arguments):
+    input_dir = arguments["input"]
+    output_dir = arguments["output"]
+    error_dir = arguments["errorOutput"]
+
     failed = []
     for index, pdb_id in enumerate(pdb_ids):
         logging.info("%i/%i : %s", index, len(pdb_ids), pdb_id)
-        output_path = os.path.join(OUTPUT_DIRECTORY, pdb_id + ".json")
+        output_path = os.path.join(output_dir, pdb_id + ".json")
         try:
             convert_file(
                 pdb_id.upper(),
-                os.path.join(INPUT_DIRECTORY, pdb_id + ".pdb_predictions.csv"),
-                os.path.join(INPUT_DIRECTORY, pdb_id + ".pdb_residues.csv"),
+                os.path.join(input_dir, pdb_id + ".pdb_predictions.csv"),
+                os.path.join(input_dir, pdb_id + ".pdb_residues.csv"),
                 output_path)
         except Exception as error:
             failed.append(pdb_id)
             logging.exception("Conversion failed for %s : %s", pdb_id, error)
             if os.path.exists(output_path):
                 error_path = os.path.join(
-                    ERROR_DIRECTORY, os.path.basename(output_path))
+                    error_dir, os.path.basename(output_path))
                 shutil.move(output_path, error_path)
     logging.info("Converted: %s failed: %s",
                  len(pdb_ids) - len(failed), len(failed))
 
 
-def convert_multiple_threads(pdb_ids, threads):
-    pool = multiprocessing.Pool(threads)
+def convert_multiple_threads(pdb_ids, arguments):
+    pool = multiprocessing.Pool(arguments["threads"])
     logging.info("Converting file ...")
-    pool.map(convert_pdb_file, pdb_ids)
+    tasks = [{
+        "pdb": pdb,
+        "input": arguments["input"],
+        "output": arguments["output"],
+        "errorOutput": arguments["errorOutput"]
+    } for pdb in pdb_ids]
+    pool.map(convert_pdb_file, tasks)
     logging.info("Converting file ... done")
 
 
-def convert_pdb_file(pdb_id):
-    output_path = os.path.join(OUTPUT_DIRECTORY, pdb_id + ".json")
+def convert_pdb_file(task):
+    pdb_id = task["pdb"]
+    input_dir = task["input"]
+    output_dir = task["output"]
+    error_dir = task["errorOutput"]
+    #
+    output_path = os.path.join(output_dir, pdb_id + ".json")
     try:
         convert_file(
             pdb_id.upper(),
-            os.path.join(INPUT_DIRECTORY, pdb_id + ".pdb_predictions.csv"),
-            os.path.join(INPUT_DIRECTORY, pdb_id + ".pdb_residues.csv"),
+            os.path.join(input_dir, pdb_id + ".pdb_predictions.csv"),
+            os.path.join(input_dir, pdb_id + ".pdb_residues.csv"),
             output_path)
     except Exception as error:
         logging.exception("Conversion failed for %s : %s", pdb_id, error)
         if os.path.exists(output_path):
             error_path = os.path.join(
-                ERROR_DIRECTORY, os.path.basename(output_path))
+                error_dir, os.path.basename(output_path))
             shutil.move(output_path, error_path)
 
 
@@ -294,6 +300,14 @@ def validate_file(path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--threads", type=int, dest="threads", required=False,
-                        default=0, help="Number of threads to use.")
+    parser.add_argument("--threads", type=int, default=0)
+    parser.add_argument("--input", type=str,
+                        default=os.path.join(
+                            THIS_DIRECTORY, "..", "data", "p2rank-outputs"))
+    parser.add_argument("--output", type=str,
+                        default=os.path.join(
+                            THIS_DIRECTORY, "..", "data", "funpdbe"))
+    parser.add_argument("--errorOutput", type=str,
+                        default=os.path.join(
+                            THIS_DIRECTORY, "..", "data", "error"))
     main(vars(parser.parse_args()))
