@@ -10,6 +10,7 @@ import sys
 import shutil
 import multiprocessing
 import argparse
+import enum
 
 from validator.validator import Validator
 from validator.residue_index import ResidueIndexes
@@ -41,6 +42,12 @@ THIS_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 
 FUNPDBE_SCHEMA = os.path.join(
     THIS_DIRECTORY, "..", "funpdbe-validator", "data", "funpdbe_schema.json")
+
+
+class ConversionStatus(enum.Enum):
+    DONE = 0
+    SKIPPED = 1
+    FAILED = 2
 
 
 def main(arguments):
@@ -87,15 +94,18 @@ def convert_single_thread(pdb_ids, arguments):
     error_dir = arguments["errorOutput"]
 
     failed = []
+    skipped = []
     for index, pdb_id in enumerate(pdb_ids):
         logging.info("%i/%i : %s", index, len(pdb_ids), pdb_id)
         output_path = os.path.join(output_dir, pdb_id + ".json")
         try:
-            convert_file(
+            result = convert_file(
                 pdb_id.upper(),
                 os.path.join(input_dir, pdb_id + ".pdb.gz_predictions.csv"),
                 os.path.join(input_dir, pdb_id + ".pdb.gz_residues.csv"),
                 output_path)
+            if result == ConversionStatus.SKIPPED:
+                skipped.append(pdb_id)
         except Exception as error:
             failed.append(pdb_id)
             logging.exception("Conversion failed for %s : %s", pdb_id, error)
@@ -103,21 +113,27 @@ def convert_single_thread(pdb_ids, arguments):
                 error_path = os.path.join(
                     error_dir, os.path.basename(output_path))
                 shutil.move(output_path, error_path)
-    logging.info("Converted: %s failed: %s",
-                 len(pdb_ids) - len(failed), len(failed))
+    logging.info("Converted: %s skipped: %s failed: %s",
+                 len(pdb_ids) - len(failed) - len(skipped),
+                 len(skipped), len(failed))
 
 
 def convert_multiple_threads(pdb_ids, arguments):
     pool = multiprocessing.Pool(arguments["threads"])
-    logging.info("Converting file ...")
+    logging.info("Converting files ...")
     tasks = [{
         "pdb": pdb,
         "input": arguments["input"],
         "output": arguments["output"],
         "errorOutput": arguments["errorOutput"]
     } for pdb in pdb_ids]
-    pool.map(convert_pdb_file, tasks)
-    logging.info("Converting file ... done")
+    results = pool.map(convert_pdb_file, tasks)
+    converted_count = len([x for x in results if x == ConversionStatus.DONE])
+    skipped_count = len([x for x in results if x == ConversionStatus.SKIPPED])
+    failed_count = len([x for x in results if x == ConversionStatus.FAILED])
+    logging.info("Converting files ... done")
+    logging.info("Converted: %s skipped: %s failed: %s",
+                 converted_count, skipped_count, failed_count)
 
 
 def convert_pdb_file(task):
@@ -126,9 +142,9 @@ def convert_pdb_file(task):
     output_dir = task["output"]
     error_dir = task["errorOutput"]
     #
-    output_path = os.path.join(output_dir, pdb_id + ".json")
+    output_path = get_output_path(output_dir, pdb_id)
     try:
-        convert_file(
+        return convert_file(
             pdb_id.upper(),
             os.path.join(input_dir, pdb_id + ".pdb.gz_predictions.csv"),
             os.path.join(input_dir, pdb_id + ".pdb.gz_residues.csv"),
@@ -139,11 +155,22 @@ def convert_pdb_file(task):
             error_path = os.path.join(
                 error_dir, os.path.basename(output_path))
             shutil.move(output_path, error_path)
+        return ConversionStatus.FAILED
 
 
-def convert_file(pdb_id, pocket_path, residues_path, output_path):
+def get_output_path(output_dir, pdb_id):
+    sub_dir = pdb_id[1:-1]
+    return os.path.join(output_dir, sub_dir, pdb_id + ".json")
+
+
+def convert_file(pdb_id, pocket_path, residues_path, output_path) \
+        -> ConversionStatus:
     residues = read_residues(residues_path)
     pockets = read_pockets(pocket_path)
+
+    if len(pockets) == 0:
+        logging.debug("Skipping file with no predictions: %s", pdb_id)
+        return ConversionStatus.SKIPPED
 
     sites = []
     chains_dictionary = {}
@@ -156,10 +183,12 @@ def convert_file(pdb_id, pocket_path, residues_path, output_path):
     chains = flat_chains_dictionary(chains_dictionary)
 
     funpdbe = create_output_file(pdb_id, sites, chains)
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w") as out_stream:
         json.dump(funpdbe, out_stream, indent=2)
 
     validate_file(output_path)
+    return ConversionStatus.DONE
 
 
 def read_residues(residues_path):
