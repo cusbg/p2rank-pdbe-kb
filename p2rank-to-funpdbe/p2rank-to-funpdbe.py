@@ -19,9 +19,7 @@ DATA_RESOURCE = "p2rank"
 
 RESOURCE_VERSION = "1.0"
 
-P2RANK_VERSION = "2.0"
-
-P2RANK_WEB_URL = "http://prankweb.cz/analyze/id_noconser/{}"
+P2RANK_WEB_URL = "http://prankweb.cz/analyze/id/{}"
 
 RELEASE_DATE = datetime.date.today().strftime("%d/%m/%Y")
 
@@ -43,6 +41,10 @@ THIS_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 FUNPDBE_SCHEMA = os.path.join(
     THIS_DIRECTORY, "..", "funpdbe-validator", "data", "funpdbe_schema.json")
 
+PREDICTION_FILE_SUFFIX = ".pdb_predictions.csv"
+
+RESIDUES_FILE_SUFFIX = ".pdb_residues.csv"
+
 
 class ConversionStatus(enum.Enum):
     DONE = 0
@@ -52,9 +54,12 @@ class ConversionStatus(enum.Enum):
 
 def main(arguments):
     init_logging()
+    logging.info("Creating directories ...")
     initialize_directories(arguments)
     check_directories()
+    logging.info("Collecting PDB files from: %s", arguments["input"])
     pdb_ids = collect_pdb_ids(arguments["input"])
+    logging.info("Starting validation ...")
     if arguments["threads"] < 2:
         convert_single_thread(pdb_ids, arguments)
     else:
@@ -89,21 +94,24 @@ def collect_pdb_ids(input_dir):
 
 
 def convert_single_thread(pdb_ids, arguments):
+    logging.info("Starting in a single thread")
     input_dir = arguments["input"]
     output_dir = arguments["output"]
     error_dir = arguments["errorOutput"]
-
+    p2rank_version = arguments["p2rankVersion"]
+    #
     failed = []
     skipped = []
     for index, pdb_id in enumerate(pdb_ids):
         logging.info("%i/%i : %s", index, len(pdb_ids), pdb_id)
-        output_path = os.path.join(output_dir, pdb_id + ".json")
+        output_path = get_output_path(
+            output_dir, pdb_id, p2rank_version)
         try:
             result = convert_file(
                 pdb_id.upper(),
-                os.path.join(input_dir, pdb_id + ".pdb.gz_predictions.csv"),
-                os.path.join(input_dir, pdb_id + ".pdb.gz_residues.csv"),
-                output_path)
+                os.path.join(input_dir, pdb_id + PREDICTION_FILE_SUFFIX),
+                os.path.join(input_dir, pdb_id + RESIDUES_FILE_SUFFIX),
+                output_path, p2rank_version)
             if result == ConversionStatus.SKIPPED:
                 skipped.append(pdb_id)
         except Exception as error:
@@ -125,7 +133,9 @@ def convert_multiple_threads(pdb_ids, arguments):
         "pdb": pdb,
         "input": arguments["input"],
         "output": arguments["output"],
-        "errorOutput": arguments["errorOutput"]
+        "errorOutput": arguments["errorOutput"],
+        "outputVersion": arguments["outputVersion"],
+        "p2rankVersion": arguments["p2rankVersion"]
     } for pdb in pdb_ids]
     results = pool.map(convert_pdb_file, tasks)
     converted_count = len([x for x in results if x == ConversionStatus.DONE])
@@ -141,14 +151,15 @@ def convert_pdb_file(task):
     input_dir = task["input"]
     output_dir = task["output"]
     error_dir = task["errorOutput"]
+    p2rank_version = task["p2rankVersion"]
     #
-    output_path = get_output_path(output_dir, pdb_id)
+    output_path = get_output_path(output_dir, pdb_id, p2rank_version)
     try:
         return convert_file(
             pdb_id.upper(),
             os.path.join(input_dir, pdb_id + ".pdb.gz_predictions.csv"),
             os.path.join(input_dir, pdb_id + ".pdb.gz_residues.csv"),
-            output_path)
+            output_path, p2rank_version)
     except Exception as error:
         logging.exception("Conversion failed for %s : %s", pdb_id, error)
         if os.path.exists(output_path):
@@ -158,12 +169,14 @@ def convert_pdb_file(task):
         return ConversionStatus.FAILED
 
 
-def get_output_path(output_dir, pdb_id):
+def get_output_path(output_dir, pdb_id, p2rank_version):
     sub_dir = pdb_id[1:-1]
-    return os.path.join(output_dir, sub_dir, pdb_id + ".json")
+    return os.path.join(
+        output_dir, sub_dir, pdb_id + "-" + p2rank_version + ".json")
 
 
-def convert_file(pdb_id, pocket_path, residues_path, output_path) \
+def convert_file(
+        pdb_id, pocket_path, residues_path, output_path, p2rank_version) \
         -> ConversionStatus:
     residues = read_residues(residues_path)
     pockets = read_pockets(pocket_path)
@@ -182,7 +195,7 @@ def convert_file(pdb_id, pocket_path, residues_path, output_path) \
             add_residue_to_chains(residue, chains_dictionary)
     chains = flat_chains_dictionary(chains_dictionary)
 
-    funpdbe = create_output_file(pdb_id, sites, chains)
+    funpdbe = create_output_file(pdb_id, sites, chains, p2rank_version)
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w") as out_stream:
         json.dump(funpdbe, out_stream, indent=2)
@@ -294,11 +307,11 @@ def flat_chains_dictionary(chains_dictionary):
     } for chain_label, residues in chains_dictionary.items()]
 
 
-def create_output_file(pdb_id, sites, chains):
+def create_output_file(pdb_id, sites, chains, software_version):
     return {
         "data_resource": DATA_RESOURCE,
         "resource_version": RESOURCE_VERSION,
-        "software_version": P2RANK_VERSION,
+        "software_version": software_version,
         "resource_entry_url": P2RANK_WEB_URL.format(pdb_id.upper()),
         "release_date": RELEASE_DATE,
         "pdb_id": pdb_id.lower(),
@@ -314,7 +327,8 @@ def validate_file(path):
     validator.load_schema(FUNPDBE_SCHEMA)
     validator.load_json(path)
     if not validator.basic_checks():
-        raise RuntimeError("Basic checks failed for {}".format(path))
+        logging.error(validator.error_log)
+        raise RuntimeError("Basic checks failed for {}:".format(path))
     if not validator.validate_against_schema():
         logging.error(validator.error_log)
         raise RuntimeError("Invalid schema for {}".format(path))
@@ -330,13 +344,9 @@ def validate_file(path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--threads", type=int, default=0)
-    parser.add_argument("--input", type=str,
-                        default=os.path.join(
-                            THIS_DIRECTORY, "..", "data", "p2rank-outputs"))
-    parser.add_argument("--output", type=str,
-                        default=os.path.join(
-                            THIS_DIRECTORY, "..", "data", "funpdbe"))
-    parser.add_argument("--errorOutput", type=str,
-                        default=os.path.join(
-                            THIS_DIRECTORY, "..", "data", "error"))
+    parser.add_argument("--input", type=str, required=True)
+    parser.add_argument("--output", type=str, required=True)
+    parser.add_argument("--errorOutput", type=str, required=True)
+    # Version of resource submitted.
+    parser.add_argument("--p2rankVersion", type=str, required=True)
     main(vars(parser.parse_args()))
