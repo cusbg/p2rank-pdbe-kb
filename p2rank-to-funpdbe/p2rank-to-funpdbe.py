@@ -6,7 +6,7 @@ import logging
 import csv
 import datetime
 import json
-import sys
+import collections
 import shutil
 import multiprocessing
 import argparse
@@ -45,6 +45,7 @@ PREDICTION_FILE_SUFFIX = ".pdb_predictions.csv"
 
 RESIDUES_FILE_SUFFIX = ".pdb_residues.csv"
 
+ResidueRef = collections.namedtuple("ResidueReference", ["chain", "index"])
 
 class ConversionStatus(enum.Enum):
     DONE = 0
@@ -237,7 +238,11 @@ def read_pockets(pocket_path):
         "rank": row["rank"],
         "center_x": row["center_x"],
         "center_y": row["center_y"],
-        "center_z": row["center_z"]
+        "center_z": row["center_z"],
+        "residues": [
+            ResidueRef(*item.split("_"))
+            for item in row["residue_ids"].split(" ")
+        ]
     } for row in iterate_csv_file(pocket_path)]
 
 
@@ -259,7 +264,8 @@ def create_site(pocket):
 
 def iterate_site_residues(pocket, residues, site_id):
     for residue in residues:
-        if residue["pocket"] == pocket["rank"]:
+        residue_ref = ResidueRef(residue["chains"], residue["label"])
+        if residue_ref in pocket["residues"]:
             yield residue_to_site_data(residue, site_id)
 
 
@@ -297,7 +303,7 @@ def add_residue_to_chains(residue, chains_dictionary):
             "aa_type": residue["aa"],
             "site_data": []
         }
-        chain_residues[residue_key]["site_data"].append(residue["site_data"])
+    chain_residues[residue_key]["site_data"].append(residue["site_data"])
 
 
 def flat_chains_dictionary(chains_dictionary):
