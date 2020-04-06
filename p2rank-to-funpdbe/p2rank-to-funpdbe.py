@@ -157,8 +157,8 @@ def convert_pdb_file(task):
     try:
         return convert_file(
             pdb_id.upper(),
-            os.path.join(input_dir, pdb_id + ".pdb.gz_predictions.csv"),
-            os.path.join(input_dir, pdb_id + ".pdb.gz_residues.csv"),
+            os.path.join(input_dir, pdb_id + PREDICTION_FILE_SUFFIX),
+            os.path.join(input_dir, pdb_id + RESIDUES_FILE_SUFFIX),
             output_path, p2rank_version)
     except Exception as error:
         logging.exception("Conversion failed for %s : %s", pdb_id, error)
