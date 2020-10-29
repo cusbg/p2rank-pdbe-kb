@@ -5,6 +5,7 @@ This repository holds scripts which are used to export P2Rank predictions to PDB
 ## PDBe-KB
 More information about PDBe-KB can be found at:
 * https://gitlab.ebi.ac.uk/pdbe-kb
+* https://www.ebi.ac.uk/pdbe/pdbe-kb
 
 You can register into the [PDBe-KB mailing list](https://listserver.ebi.ac.uk/mailman/listinfo/pdbe-kb-depositor) 
 for email notifications.
