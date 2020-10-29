@@ -1,12 +1,11 @@
-# P2Rank to FunPDBe conversion
+# P2Rank to PDBe-KB export
 
 ## FunPDBe
-More information about FunPDBe can be found at:
-* https://www.ebi.ac.uk/pdbe/funpdbe/deposition
+More information about PDBe-KB can be found at:
 * https://gitlab.ebi.ac.uk/pdbe-kb
 
-You can register into [mailing list](https://listserver.ebi.ac.uk/mailman/listinfo/pdbe-kb-depositor) 
-for email notifications at:
+You can register into the [PDBe-KB mailing list](https://listserver.ebi.ac.uk/mailman/listinfo/pdbe-kb-depositor) 
+for email notifications.
 
 ## Quick start
 
