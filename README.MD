@@ -1,6 +1,8 @@
 # P2Rank to PDBe-KB export
 
-## FunPDBe
+This repository holds scripts which are used to export P2Rank predictions to PDBe-KB.
+
+## PDBe-KB
 More information about PDBe-KB can be found at:
 * https://gitlab.ebi.ac.uk/pdbe-kb
 
